@@ -713,6 +713,8 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
+
+        DbgBreakPoint();
         device = WDF_NO_HANDLE;
 
         device_init_ptr init(vhci);
