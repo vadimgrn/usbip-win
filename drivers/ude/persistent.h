@@ -24,8 +24,4 @@ PAGED NTSTATUS copy(
         _Inout_ char *service, _In_ USHORT service_sz, _In_ const UNICODE_STRING &uservice,
         _Inout_ char *busid, _In_ USHORT busid_sz, _In_ const UNICODE_STRING &ubusid);
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void plugin_persistent_devices(_In_ vhci_ctx *vhci);
-
 } // namespace usbip

@@ -11,7 +11,6 @@
 #include "device.h"
 #include "network.h"
 #include "ioctl.h"
-#include "persistent.h"
 
 #include <usbip\proto_op.h>
 
@@ -611,70 +610,6 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
         return STATUS_SUCCESS;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto set_persistent(_In_ WDFREQUEST request)
-{
-        PAGED_CODE();
-
-        void *buf{};
-        size_t length{};
-        if (auto err = WdfRequestRetrieveInputBuffer(request, 0, &buf, &length)) {
-                return err;
-        }
-
-        Registry key;
-        if (auto err = open_parameters_key(key, KEY_SET_VALUE)) {
-                return err;
-        }
-
-        UNICODE_STRING val_name;
-        RtlUnicodeStringInit(&val_name, persistent_devices_value_name);
-
-        auto st = WdfRegistryAssignValue(key.get(), &val_name, REG_MULTI_SZ, ULONG(length), buf);
-        if (st) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRegistryAssignValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
-        }
-        return st;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto get_persistent(_In_ WDFREQUEST request)
-{
-        PAGED_CODE();
-        WdfRequestSetInformation(request, 0);
-
-        void *buf{};
-        size_t length{};
-        if (auto err = WdfRequestRetrieveOutputBuffer(request, 0, &buf, &length)) {
-                return err;
-        }
-
-        Registry key;
-        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE)) {
-                return err;
-        }
-
-        UNICODE_STRING val_name;
-        RtlUnicodeStringInit(&val_name, persistent_devices_value_name);
-
-        ULONG actual{};
-        auto type = REG_NONE;
-        auto st = WdfRegistryQueryValue(key.get(), &val_name, ULONG(length), buf, &actual, &type);
-
-        if (st) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
-        } else if (type != REG_MULTI_SZ) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryValue(%!USTR!): type(%ul) != REG_MULTI_SZ(%ul)", &val_name, type, REG_MULTI_SZ);
-                st = STATUS_INVALID_CONFIG_VALUE;
-                actual = 0;
-        }
-
-        WdfRequestSetInformation(request, actual);
-        return st;
-}
-
 /*
  * IRP_MJ_DEVICE_CONTROL
  * 
@@ -710,6 +645,9 @@ PAGED void device_control(
         case vhci::ioctl::PLUGOUT_HARDWARE:
                 st = plugout_hardware(Request);
                 break;
+        case vhci::ioctl::GET_IMPORTED_DEVICES:
+                st = get_imported_devices(Request);
+                break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));
                 if (USBUSER_REQUEST_HEADER *hdr; 
@@ -724,70 +662,6 @@ PAGED void device_control(
 
                 st = UdecxWdfDeviceTryHandleUserIoctl(vhci, Request) ? // PASSIVE_LEVEL
                         STATUS_PENDING : STATUS_INVALID_DEVICE_REQUEST;
-        }
-
-        if (st != STATUS_PENDING) {
-                TraceDbg("%!STATUS!, Information %Ix", st, WdfRequestGetInformation(Request));
-                WdfRequestComplete(Request, st);
-        }
-}
-
-/*
- * There is an internal lock on the registry, but that’s just to ensure that registry operations are atomic; 
- * that is, that if one thread writes a value to the registry and another thread reads that same value 
- * from the registry, then the value that comes back is either the value before the write took place 
- * or the value after the write took place, but not some sort of mixture of the two.
- *
- * @see Raymond Chen, The inability to lock someone out of the registry is a feature, not a bug
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED decltype(get_persistent) *get_parallel_handler(_In_ ULONG IoControlCode)
-{
-        PAGED_CODE();
-
-        switch (IoControlCode) {
-        case vhci::ioctl::GET_IMPORTED_DEVICES:
-                return get_imported_devices;
-        case vhci::ioctl::SET_PERSISTENT:
-                return set_persistent;
-        case vhci::ioctl::GET_PERSISTENT:
-                return get_persistent;
-        default:
-                return nullptr;
-        }
-}
-
-_Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-PAGED void device_control_parallel(
-        _In_ WDFQUEUE Queue,
-        _In_ WDFREQUEST Request,
-        _In_ size_t OutputBufferLength,
-        _In_ size_t InputBufferLength,
-        _In_ ULONG IoControlCode)
-{
-        PAGED_CODE();
-
-        NTSTATUS st;
-
-        if (auto handler = get_parallel_handler(IoControlCode)) {
-                TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
-                          device_control_name(IoControlCode), IoControlCode, OutputBufferLength, InputBufferLength);
-
-                st = handler(Request);
-        } else {
-                auto vhci = WdfIoQueueGetDevice(Queue);
-                auto def_queue = WdfDeviceGetDefaultQueue(vhci);
-
-                st = WdfRequestForwardToIoQueue(Request, def_queue); // -> device_control
-
-                if (NT_SUCCESS(st)) [[likely]] {
-                        st = STATUS_PENDING;
-                } else {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", st);
-                }
         }
 
         if (st != STATUS_PENDING) {
@@ -818,18 +692,6 @@ PAGED NTSTATUS usbip::vhci::create_queues(_In_ WDFDEVICE vhci)
 
         if (auto err = WdfIoQueueCreate(vhci, &cfg, &attr, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
-                return err;
-        }
-
-        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel);
-        cfg.PowerManaged = PowerManaged;
-        cfg.EvtIoDeviceControl = device_control_parallel;
-
-        if (WDFQUEUE queue{}; auto err = WdfIoQueueCreate(vhci, &cfg, &attr, &queue)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
-                return err;
-        } else if (err = WdfDeviceConfigureRequestDispatching(vhci, queue, WdfRequestTypeDeviceControl); err) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDeviceConfigureRequestDispatching %!STATUS!", err);
                 return err;
         }
 

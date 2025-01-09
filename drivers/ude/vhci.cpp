@@ -7,8 +7,8 @@
 #include "vhci.tmh"
 
 #include "device.h"
-#include "vhci_ioctl.h"
 #include "persistent.h"
+#include "vhci_ioctl.h"
 
 #include <ntstrsafe.h>
 
@@ -19,37 +19,6 @@ namespace
 {
 
 using namespace usbip;
-
-/*
- * A pageable thread or pageable driver routine that runs at IRQL = PASSIVE_LEVEL 
- * should never call KeSetEvent with the Wait parameter set to TRUE. 
- * Such a call causes a fatal page fault if the caller happens to be paged out 
- * between the calls to KeSetEvent and KeWaitXxx.
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-/*PAGED*/ void attach_thread_join(_In_ WDFDEVICE vhci) // not PAGED, see KeSetEvent
-{
-        NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
-        auto &ctx = *get_vhci_ctx(vhci);
-
-        auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&ctx.attach_thread), nullptr);
-        if (!thread) {
-                TraceDbg("already exited");
-                return;
-        }
-
-        TraceDbg("signal stop and wait"); 
-
-        if (KeSetEvent(&ctx.attach_thread_stop, IO_NO_INCREMENT, true); // raises IRQL
-            auto err = KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "KeWaitForSingleObject %!STATUS!", err);
-        } else {
-                TraceDbg("joined");
-        }
-
-        ObDereferenceObject(thread);
-}
 
 /*
  * WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE.
@@ -63,8 +32,6 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
 
         auto vhci = static_cast<WDFDEVICE>(object);
         TraceDbg("vhci %04x", ptr04x(vhci));
-
-        attach_thread_join(vhci);
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
@@ -94,8 +61,6 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
                 return err;
         }
-
-        KeInitializeEvent(&ctx.attach_thread_stop, NotificationEvent, false);
 
         return STATUS_SUCCESS;
 }
@@ -529,10 +494,5 @@ PAGED NTSTATUS usbip::DeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
-        
-        if (auto ctx = get_vhci_ctx(vhci)) {
-                plugin_persistent_devices(ctx);
-        }
-
         return STATUS_SUCCESS;
 }
