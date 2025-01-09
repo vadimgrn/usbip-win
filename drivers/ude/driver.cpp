@@ -27,8 +27,8 @@ PAGED void driver_cleanup(_In_ WDFOBJECT Object)
 	auto drv = static_cast<WDFDRIVER>(Object);
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(drv));
 
-	wsk::shutdown();
-	delete_wsk_context_list();
+	//wsk::shutdown();
+	//delete_wsk_context_list();
 
 	auto drvobj = WdfDriverWdmGetDriverObject(drv);
 	WPP_CLEANUP(drvobj);
@@ -56,17 +56,6 @@ _IRQL_requires_(PASSIVE_LEVEL)
 CS_INIT auto init()
 {
 	PAGED_CODE();
-
-	if (auto err = init_wsk_context_list(pooltag)) {
-		Trace(TRACE_LEVEL_CRITICAL, "ExInitializeLookasideListEx %!STATUS!", err);
-		return err;
-	}
-
-	if (auto err = wsk::initialize()) {
-		Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", err);
-		return err;
-	}
-
 	return STATUS_SUCCESS;
 }
 

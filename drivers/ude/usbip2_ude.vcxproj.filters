@@ -22,20 +22,15 @@
     <ClInclude Include="driver.h" />
     <ClInclude Include="vhci_ioctl.h" />
     <ClInclude Include="trace.h" />
-    <ClInclude Include="device.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="context.h" />
-    <ClInclude Include="wsk_receive.h" />
-    <ClInclude Include="device_ioctl.h" />
     <ClInclude Include="wsk_context.h" />
-    <ClInclude Include="request_list.h" />
     <ClInclude Include="proto.h" />
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>
-    <ClInclude Include="filter_request.h" />
     <ClInclude Include="endpoint_list.h" />
     <ClInclude Include="persistent.h" />
   </ItemGroup>
@@ -43,17 +38,12 @@
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="vhci_ioctl.cpp" />
-    <ClCompile Include="device.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="urbtransfer.cpp" />
     <ClCompile Include="context.cpp" />
-    <ClCompile Include="wsk_receive.cpp" />
-    <ClCompile Include="device_ioctl.cpp" />
     <ClCompile Include="wsk_context.cpp" />
-    <ClCompile Include="request_list.cpp" />
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
-    <ClCompile Include="filter_request.cpp" />
     <ClCompile Include="endpoint_list.cpp" />
     <ClCompile Include="persistent.cpp" />
   </ItemGroup>

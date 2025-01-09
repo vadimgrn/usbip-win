@@ -6,7 +6,6 @@
 #include "trace.h"
 #include "vhci.tmh"
 
-#include "device.h"
 #include "persistent.h"
 #include "vhci_ioctl.h"
 
@@ -91,30 +90,12 @@ _Function_class_(EVT_UDECX_WDF_DEVICE_QUERY_USB_CAPABILITY)
 _IRQL_requires_same_
 NTSTATUS query_usb_capability(
         _In_ WDFDEVICE /*UdecxWdfDevice*/,
-        _In_ GUID *CapabilityType,
+        _In_ GUID *,
         _In_ ULONG /*OutputBufferLength*/,
         _Out_writes_to_opt_(OutputBufferLength, *ResultLength) PVOID /*OutputBuffer*/,
-        _Out_ ULONG *ResultLength)
+        _Out_ ULONG *)
 {
-        const GUID* supported[] = {
-                &GUID_USB_CAPABILITY_CHAINED_MDLS, 
-                &GUID_USB_CAPABILITY_SELECTIVE_SUSPEND, // class extension reports it as supported without invoking the callback
-//              &GUID_USB_CAPABILITY_FUNCTION_SUSPEND,
-                &GUID_USB_CAPABILITY_DEVICE_CONNECTION_HIGH_SPEED_COMPATIBLE, 
-                &GUID_USB_CAPABILITY_DEVICE_CONNECTION_SUPER_SPEED_COMPATIBLE 
-        };
-
-        auto st = STATUS_NOT_SUPPORTED;
-
-        for (auto i: supported) {
-                if (*i == *CapabilityType) {
-                        st = STATUS_SUCCESS;
-                        break;
-                }
-        }
-
-        *ResultLength = 0;
-        return st;
+        return STATUS_NOT_SUPPORTED;
 }
 
 /*
@@ -165,7 +146,7 @@ PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
         PAGED_CODE();
         TraceDbg("%04x", ptr04x(vhci));
 
-        detach_all_devices(vhci, vhci::detach_call::async_nowait); // must not block this callback for long time
+        //detach_all_devices(vhci, vhci::detach_call::async_nowait); // must not block this callback for long time
         return STATUS_SUCCESS;
 }
 
@@ -182,17 +163,17 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *init)
                 WDF_PNPPOWER_EVENT_CALLBACKS cb;
                 WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&cb);
 
-                cb.EvtDeviceD0Exit = vhci_d0_exit;
-                cb.EvtDeviceD0Entry = vhci_d0_entry;
-                cb.EvtDeviceQueryRemove = vhci_query_remove;
+                //cb.EvtDeviceD0Exit = vhci_d0_exit;
+                //cb.EvtDeviceD0Entry = vhci_d0_entry;
+                //cb.EvtDeviceQueryRemove = vhci_query_remove;
 
                 WdfDeviceInitSetPnpPowerEventCallbacks(init, &cb);
         }
 
         {
-                WDF_REMOVE_LOCK_OPTIONS opts;
-                WDF_REMOVE_LOCK_OPTIONS_INIT(&opts, WDF_REMOVE_LOCK_OPTION_ACQUIRE_FOR_IO);
-                WdfDeviceInitSetRemoveLockOptions(init, &opts);
+                //WDF_REMOVE_LOCK_OPTIONS opts;
+                //WDF_REMOVE_LOCK_OPTIONS_INIT(&opts, WDF_REMOVE_LOCK_OPTION_ACQUIRE_FOR_IO);
+                //WdfDeviceInitSetRemoveLockOptions(init, &opts);
         }
 
         {
@@ -325,30 +306,6 @@ auto get_port_range(_In_ usb_device_speed speed)
         return r;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto get_detach_function(_In_ vhci::detach_call how)
-{
-        PAGED_CODE();
-        decltype(device::detach) *f{};
-
-        switch (how) {
-                using enum vhci::detach_call;
-        case async_wait:
-                f = device::async_detach_and_wait;
-                break;
-        case async_nowait:
-                f = device::async_detach_nowait;
-                break;
-        case direct:
-                f = device::detach;
-                break;
-        }
-
-        NT_ASSERT(f);
-        return f;
-}
-
 } // namespace
 
 
@@ -440,18 +397,9 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ detach_call how)
+PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE , _In_ detach_call )
 {
         PAGED_CODE();
-
-        TraceDbg("%04x", ptr04x(vhci));
-        auto detach = get_detach_function(how);
-
-        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {
-                        detach(hdev);
-                }
-        }
 }
 
 _IRQL_requires_same_

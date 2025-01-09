@@ -8,7 +8,6 @@
 
 #include "context.h"
 #include "wsk_context.h"
-#include "device.h"
 #include "request_list.h"
 #include "network.h"
 #include "driver.h"
