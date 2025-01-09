@@ -254,7 +254,6 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
         NT_VERIFY(NT_SUCCESS(WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)));
 
         auto vhci = get_vhci(request);
-        device_state_changed(vhci, *ext, 0, vhci::state::connected);
 
         if (auto err = import_remote_device(*ext)) {
                 return err;
@@ -272,11 +271,6 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), r->port);
-
-        if (auto ctx = get_device_ctx(dev)) {
-                device_state_changed(*ctx, vhci::state::plugged);
-        }
-
         return STATUS_SUCCESS;
 }
 
@@ -432,8 +426,6 @@ PAGED void workitem_cleanup(_In_ WDFOBJECT obj)
 
         if (auto &ext = ctx.ext) {
                 close_socket(ext->sock);
-                device_state_changed(ctx.vhci, *ext, 0, vhci::state::disconnected);
-
                 free(ext);
                 ext = nullptr;
         }
@@ -503,8 +495,6 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
                 WdfObjectDelete(wi);
                 return err;
         }
-
-        device_state_changed(vhci, *ctx.ext, 0, vhci::state::connecting);
 
         getaddrinfo(request, wi, ctx); // completion handler will be called anyway
         return STATUS_PENDING;
@@ -806,45 +796,6 @@ PAGED void device_control_parallel(
         }
 }
 
-_Function_class_(EVT_WDF_IO_QUEUE_IO_READ)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t length)
-{
-        PAGED_CODE();
-
-        auto fileobj = WdfRequestGetFileObject(request);
-        auto &fobj = *get_fileobject_ctx(fileobj);
-
-        TraceDbg("fobj %04x, request %04x, length %Iu", ptr04x(fileobj), ptr04x(request), length);
-
-        if (length != sizeof(vhci::device_state)) {
-                WdfRequestCompleteWithInformation(request, STATUS_INVALID_BUFFER_SIZE, 0);
-                return;
-        }
-
-        auto device = WdfIoQueueGetDevice(queue);
-        auto &vhci = *get_vhci_ctx(device);
-        
-        wdf::WaitLock lck(vhci.events_lock);
-
-        if (auto &val = fobj.process_events; !val) {
-                ++vhci.events_subscribers;
-                val = true;
-        }
-
-        if (auto evt = (WDFMEMORY)WdfCollectionGetFirstItem(fobj.events)) {
-                vhci::complete_read(request, evt);
-                WdfCollectionRemove(fobj.events, evt); // decrements reference count
-        } else if (auto err = WdfRequestForwardToIoQueue(request, vhci.reads)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
-                if (err == STATUS_WDF_BUSY) { // the queue is not accepting new requests, purged
-                        err = STATUS_END_OF_FILE; // ReadFile will return TRUE and set lpNumberOfBytesRead to zero
-                }
-                WdfRequestCompleteWithInformation(request, err, 0);
-        }
-}
-
 } // namespace
 
 
@@ -864,7 +815,6 @@ PAGED NTSTATUS usbip::vhci::create_queues(_In_ WDFDEVICE vhci)
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential); // WdfDeviceGetDefaultQueue
         cfg.PowerManaged = PowerManaged;
         cfg.EvtIoDeviceControl = device_control;
-        cfg.EvtIoRead = device_read;
 
         if (auto err = WdfIoQueueCreate(vhci, &cfg, &attr, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);

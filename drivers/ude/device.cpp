@@ -626,7 +626,6 @@ PAGED auto detach(_In_ UDECXUSBDEVICE device)
 
         if (close_socket(dev.sock())) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
-                device_state_changed(dev, vhci::state::disconnected);
         }
 
         auto thread = recv_thread_join(device, dev);
@@ -636,11 +635,8 @@ PAGED auto detach(_In_ UDECXUSBDEVICE device)
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
-        device_state_changed(dev.vhci, *dev.ext, port, vhci::state::unplugging);
-
         if (plugout_and_delete(device, dev.delete_lock)) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
-                device_state_changed(dev.vhci, *dev.ext, port, vhci::state::unplugged);
         }
 
         NT_VERIFY(!KeSetEvent(&dev.detach_completed, IO_NO_INCREMENT, false)); // once
