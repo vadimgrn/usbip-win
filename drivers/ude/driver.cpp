@@ -8,7 +8,6 @@
 #include "driver.tmh"
 
 #include "context.h"
-#include "wsk_context.h"
 
 #include <libdrv\wsk_cpp.h>
 

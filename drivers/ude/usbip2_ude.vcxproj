@@ -19,17 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
     <ClCompile Include="context.cpp" />
-    <ClCompile Include="persistent.cpp" />
-    <ClCompile Include="endpoint_list.cpp" />
-    <ClCompile Include="network.cpp" />
-    <ClCompile Include="proto.cpp" />
-    <ClCompile Include="urbtransfer.cpp" />
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="vhci_ioctl.cpp" />
-    <ClCompile Include="wsk_context.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip\ch9.h" />
@@ -38,17 +31,10 @@
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
     <ClInclude Include="..\..\include\usbip\vhci.h" />
     <ClInclude Include="context.h" />
-    <ClInclude Include="persistent.h" />
-    <ClInclude Include="endpoint_list.h" />
-    <ClInclude Include="ioctl.h" />
-    <ClInclude Include="network.h" />
-    <ClInclude Include="proto.h" />
-    <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="driver.h" />
     <ClInclude Include="vhci_ioctl.h" />
     <ClInclude Include="trace.h" />
-    <ClInclude Include="wsk_context.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_ude.inf" />
@@ -258,11 +244,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\libdrv\libdrv.vcxproj">
-      <Project>{27ab4325-4980-4634-9818-ae6bd61de532}</Project>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />

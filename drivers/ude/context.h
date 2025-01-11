@@ -201,12 +201,4 @@ constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
         return (busnum << 16) | devnum;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ const vhci::ioctl::plugin_hardware &r);
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void free(_In_ device_ctx_ext *ext);
-
 } // namespace usbip

@@ -8,8 +8,6 @@
 
 #include "context.h"
 #include "vhci.h"
-#include "network.h"
-#include "ioctl.h"
 
 #include <usbip\proto_op.h>
 
@@ -48,33 +46,28 @@ PAGED void device_control(
 {
         PAGED_CODE();
 
-        TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
-                  device_control_name(IoControlCode), IoControlCode, OutputBufferLength, InputBufferLength);
+        TraceDbg("%#08lX, OutputBufferLength %Iu, InputBufferLength %Iu", 
+                  IoControlCode, OutputBufferLength, InputBufferLength);
 
-        NTSTATUS st = STATUS_SUCCESS;
+        NTSTATUS st = STATUS_NOT_IMPLEMENTED;
 
         switch (IoControlCode) {
         case vhci::ioctl::PLUGIN_HARDWARE:
-                break;
         case vhci::ioctl::PLUGOUT_HARDWARE:
-                break;
         case vhci::ioctl::GET_IMPORTED_DEVICES:
-                break;
         case vhci::ioctl::SET_PERSISTENT:
-                break;
         case vhci::ioctl::GET_PERSISTENT:
                 break;
         default:
-                auto vhci = WdfIoQueueGetDevice(Queue);
-
-                st = UdecxWdfDeviceTryHandleUserIoctl(vhci, Request) ? // PASSIVE_LEVEL
-                        STATUS_PENDING : STATUS_INVALID_DEVICE_REQUEST;
+                if (auto vhci = WdfIoQueueGetDevice(Queue);
+                    UdecxWdfDeviceTryHandleUserIoctl(vhci, Request)) { // PASSIVE_LEVEL
+                        return;
+                } else {
+                        st = STATUS_INVALID_DEVICE_REQUEST;
+                }
         }
 
-        if (st != STATUS_PENDING) {
-                TraceDbg("%!STATUS!, Information %Ix", st, WdfRequestGetInformation(Request));
-                WdfRequestComplete(Request, st);
-        }
+        WdfRequestComplete(Request, st);
 }
 
 } // namespace
