@@ -31,6 +31,8 @@
 - A dedicated thread is created for each virtual device to receive data from a server
 
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
+- The 2-Clause BSD License since release 0.9.7.0
+  - If you decide to WHQL the drivers, make sure to base them on this release or newer, since the GPL 3.0 license used prior to this release is not compatible with WHQL.
 - Brand new UDE driver, not inherited from the parent repo
 - Full-featured GUI app
 - Userspace code is fully rewritten (libusbip and usbip utility)
