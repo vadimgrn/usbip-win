@@ -4,6 +4,7 @@
 
 #include "wusbip.h"
 #include "taskbaricon.h"
+#include "resource.h"
 #include "persist.h"
 #include "wxutils.h"
 #include "utils.h"
@@ -142,6 +143,28 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
                         tree.GetItemText(dev, COL_NOTES));
 
         wxLogVerbose(s);
+}
+
+auto load_license()
+{
+        wxString s;
+
+        auto hres = FindResource(nullptr, MAKEINTRESOURCE(IDR_LICENSE), RT_RCDATA);
+        if (!hres) {
+                auto err = GetLastError();
+                return s = wxString::Format(L"FindResource error %lu\n%s", err, wxSysErrorMsg(err));
+        }
+
+        auto hmem = LoadResource(nullptr, hres);
+        if (!hmem) {
+                auto err = GetLastError();
+                return s = wxString::Format(L"LoadResource error %lu\n%s", err, wxSysErrorMsg(err));
+        }
+
+        auto txt = LockResource(hmem);
+        auto len = SizeofResource(nullptr, hres);
+
+        return s = wxString::FromAscii(static_cast<const char*>(txt), len);
 }
 
 auto update_from_saved(
@@ -943,7 +966,7 @@ void MainFrame::on_help_about(wxCommandEvent&)
         d.AddDeveloper(L"Vadym Hrynchyshyn\t<vadimgrn@gmail.com>");
         d.SetWebSite(L"https://github.com/vadimgrn/usbip-win2", _("GitHub project page"));
 
-        d.SetLicence(_("GNU General Public License v3.0"));
+        d.SetLicence(load_license());
         //d.SetIcon();
 
         wxAboutBox(d, this);

@@ -91,6 +91,8 @@ END
 
 IDR_USB_IDS             RCDATA                  "../usbip/usb.ids"
 
+IDR_LICENSE             RCDATA                  "../../LICENSE.txt"
+
 ADD_SVG                 RCDATA                  "resources/Add.svg"
 
 COPY_SVG                RCDATA                  "resources/copy.svg"
