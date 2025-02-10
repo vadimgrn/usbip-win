@@ -1,4 +1,4 @@
-; Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+; Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 ;
 ; usbip2_filter.inf
 ; Upper-level class filter primitive driver (since Windows 10 version 1903).
